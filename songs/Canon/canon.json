@@ -7,11 +7,6 @@
       "wav": "F#s.wav"
     },
     {
-      "lane": 5,
-      "row": 8,
-      "wav": "codeD.wav"
-    },
-    {
       "lane": 4,
       "row": 8,
       "wav": "A.wav"
@@ -80,16 +75,6 @@
       "lane": 3,
       "row": 56,
       "wav": "F#s.wav"
-    },
-    {
-      "lane": 5,
-      "row": 32,
-      "wav": "codeA.wav"
-    },
-    {
-      "lane": 5,
-      "row": 56,
-      "wav": "codeB.wav"
     },
     {
       "lane": 1,
@@ -163,8 +148,53 @@
     },
     {
       "lane": 5,
+      "row": 8,
+      "wav": "codehiD.wav"
+    },
+    {
+      "lane": 5,
+      "row": 32,
+      "wav": "codehiA.wav"
+    },
+    {
+      "lane": 5,
+      "row": 56,
+      "wav": "codehiBm.wav"
+    },
+    {
+      "lane": 5,
       "row": 80,
-      "wav": "codeF#.wav"
+      "wav": "codehiF#.wav"
+    },
+    {
+      "lane": 5,
+      "row": 104,
+      "wav": "codehiG.wav"
+    },
+    {
+      "lane": 3,
+      "row": 110,
+      "wav": "B.wav"
+    },
+    {
+      "lane": 2,
+      "row": 113,
+      "wav": "Alow.wav"
+    },
+    {
+      "lane": 1,
+      "row": 116,
+      "wav": "lowG.wav"
+    },
+    {
+      "lane": 1,
+      "row": 125,
+      "wav": "E.wav"
+    },
+    {
+      "lane": 2,
+      "row": 122,
+      "wav": "lowF#.wav"
     }
   ],
   "bga": []
