@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>BMS Editor + BGA</title>
+
+    <style>
+
+        body{
+            background:#111;
+            color:white;
+            font-family:sans-serif;
+        }
+
+        #main{
+            display:flex;
+        }
+
+        #grid{
+            width:600px;
+            height:600px;
+            background:black;
+            border:2px solid white;
+            position:relative;
+            overflow:hidden;
+            margin:10px;
+        }
+
+        #gridInner{
+            position:absolute;
+            width:100%;
+        }
+
+        .cell{
+            position:absolute;
+            width:10%;
+            height:20px;
+            border:1px solid #333;
+            box-sizing:border-box;
+        }
+
+        .note{
+            position:absolute;
+            width:10%;
+            height:20px;
+            background:cyan;
+            font-size:9px;
+            text-align:center;
+            color:black;
+        }
+
+        .bgaNote{
+            position:absolute;
+            width:10%;
+            height:20px;
+            background:orange;
+            font-size:9px;
+            text-align:center;
+            color:black;
+        }
+
+        .startLine{
+            position:absolute;
+            width:100%;
+            height:3px;
+            background:red;
+            z-index:50;
+        }
+
+        #rightPanel{
+            width:600px;
+        }
+
+        #wavPreviewRow{
+            display:flex;
+        }
+
+        #wavList,#bmpList{
+            width:150px;
+            height:280px;
+            overflow:auto;
+            border:1px solid #555;
+        }
+
+        .previewBox{
+            width:180px;
+            height:280px;
+            background:black;
+            border:2px solid white;
+            position:relative;
+            overflow:hidden;
+            margin-left:10px;
+        }
+
+        .previewNote{
+            position:absolute;
+            width:10%;
+            height:12px;
+            background:cyan;
+            font-size:8px;
+            text-align:center;
+        }
+
+        .judge{
+            position:absolute;
+            bottom:50px;
+            width:100%;
+            height:2px;
+            background:yellow;
+        }
+
+        #bgaView{
+            width:100%;
+            height:100%;
+            object-fit:contain;
+            background:black;
+        }
+
+    </style>
+</head>
+
+<body>
+
+    BPM
+    <input id="bpmInput" value="120">
+
+    開始row
+    <input id="startRow" value="0">
+
+    <br><br>
+
+    WAVフォルダ
+    <input type="file" id="wavFolder" webkitdirectory>
+
+    BMPフォルダ
+    <input type="file" id="bmpFolder" webkitdirectory>
+
+    <button onclick="playChart()">譜面再生</button>
+    <button onclick="saveChart()">JSON保存</button>
+    <button onclick="loadChart()">JSON読込</button>
+    <input type="file" id="jsonLoader">
+
+    <div id="main">
+
+        <div id="grid">
+            <div id="gridInner"></div>
+        </div>
+
+        <div id="rightPanel">
+
+            <div id="wavPreviewRow">
+
+                <div>
+                    WAV
+                    <div id="wavList"></div>
+                </div>
+
+                <div>
+                    BMP
+                    <div id="bmpList"></div>
+                </div>
+
+                <div>
+                    Preview
+                    <div id="preview" class="previewBox">
+                        <div class="judge"></div>
+                    </div>
+                </div>
+
+                <div>
+                    BGA
+                    <div id="bgaPreview" class="previewBox">
+                        <img id="bgaView">
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+
+        const rows=128
+        const cols=10
+        const cellH=20
+
+        const gridInner=document.getElementById("gridInner")
+
+        let notes=[]
+        let bgaEvents=[]
+
+        let wavBuffers={}
+        let wavFiles={}
+        let bmpFiles={}
+
+        let selectedWav=null
+        let selectedBmp=null
+
+        const audioCtx=new (window.AudioContext||window.webkitAudioContext)()
+
+        /* grid */
+
+        for(let r=0;r<rows;r++){
+
+            for(let c=0;c<cols;c++){
+
+                let cell=document.createElement("div")
+
+                cell.className="cell"
+
+                cell.style.left=(c*(100/cols))+"%"
+
+                let y=(rows-r-1)*cellH
+
+                cell.style.top=y+"px"
+
+                cell.onclick=function(){
+
+                    if(c==9){
+
+                        addBGA(r)
+
+                    }else{
+
+                        addNote(c,r)
+
+                    }
+
+                }
+
+                gridInner.appendChild(cell)
+
+            }
+
+        }
+
+        gridInner.style.height=(rows*cellH)+"px"
+
+        /* start line */
+
+        let startLine=document.createElement("div")
+        startLine.className="startLine"
+
+        gridInner.appendChild(startLine)
+
+        function updateStart(){
+
+            let r=parseInt(startRow.value)
+
+            let y=(rows-r-1)*cellH
+
+            startLine.style.top=y+"px"
+
+        }
+
+        startRow.onchange=updateStart
+        updateStart()
+
+        /* scroll */
+
+        let scrollY=0
+
+        grid.addEventListener("wheel",function(e){
+
+            scrollY+=e.deltaY
+
+            if(scrollY<0)scrollY=0
+
+            let max=rows*cellH-600
+
+            if(scrollY>max)scrollY=max
+
+            gridInner.style.top=-scrollY+"px"
+
+        })
+
+        /* wav load */
+
+        wavFolder.onchange=async function(e){
+
+            let list=document.getElementById("wavList")
+            list.innerHTML=""
+
+            for(let f of e.target.files){
+
+                if(!f.name.endsWith(".wav"))continue
+
+                let url=URL.createObjectURL(f)
+
+                wavFiles[f.name]=url
+
+                let arr=await fetch(url).then(r=>r.arrayBuffer())
+
+                wavBuffers[f.name]=await audioCtx.decodeAudioData(arr)
+
+                let item=document.createElement("div")
+                item.innerText=f.name
+
+                item.onclick=function(){
+
+                    selectedWav=f.name
+
+                }
+
+                item.ondblclick=function(){
+
+                    playSound(f.name)
+
+                }
+
+                list.appendChild(item)
+
+            }
+
+        }
+
+        /* bmp load */
+
+        bmpFolder.onchange=function(e){
+
+            let list=document.getElementById("bmpList")
+
+            list.innerHTML=""
+
+            for(let f of e.target.files){
+
+                if(!f.name.endsWith(".bmp"))continue
+
+                let url=URL.createObjectURL(f)
+
+                bmpFiles[f.name]=url
+
+                let item=document.createElement("div")
+
+                item.innerText=f.name
+
+                item.onclick=function(){
+
+                    selectedBmp=f.name
+
+                }
+
+                list.appendChild(item)
+
+            }
+
+        }
+
+        /* play sound */
+
+        function playSound(name){
+
+            let src=audioCtx.createBufferSource()
+
+            src.buffer=wavBuffers[name]
+
+            src.connect(audioCtx.destination)
+
+            src.start()
+
+        }
+
+        /* note */
+
+        function addNote(col,row){
+
+            if(!selectedWav)return
+
+            let note=document.createElement("div")
+
+            note.className="note"
+
+            note.innerText=selectedWav
+
+            note.style.left=(col*(100/cols))+"%"
+
+            let y=(rows-row-1)*cellH
+
+            note.style.top=y+"px"
+
+            gridInner.appendChild(note)
+
+            note.oncontextmenu=function(e){
+
+                e.preventDefault()
+
+                note.remove()
+
+                notes=notes.filter(n=>!(n.lane==col && n.row==row))
+
+            }
+
+            notes.push({
+
+                lane:col,
+                row:row,
+                wav:selectedWav
+
+            })
+
+        }
+
+        /* BGA */
+
+        function addBGA(row){
+
+            if(!selectedBmp)return
+
+            let note=document.createElement("div")
+
+            note.className="bgaNote"
+
+            note.innerText="BGA"
+
+            note.style.left=(9*(100/cols))+"%"
+
+            let y=(rows-row-1)*cellH
+
+            note.style.top=y+"px"
+
+            gridInner.appendChild(note)
+
+            note.oncontextmenu=function(e){
+
+                e.preventDefault()
+
+                note.remove()
+
+                bgaEvents=bgaEvents.filter(n=>!(n.row==row))
+
+            }
+
+            bgaEvents.push({
+
+                row:row,
+                bmp:selectedBmp
+
+            })
+
+        }
+
+        /* play */
+
+        function playChart(){
+
+            let bpm=parseFloat(bpmInput.value)
+
+            let beat=60/bpm
+
+            let start=performance.now()
+
+            let judgeY=230
+
+            let preview=document.getElementById("preview")
+
+            preview.innerHTML='<div class="judge"></div>'
+
+            let previewNotes=[]
+
+            for(let n of notes){
+
+                let time=n.row*(beat/4)
+
+                let p=document.createElement("div")
+
+                p.className="previewNote"
+
+                p.innerText=""
+
+                p.style.left=(n.lane*(100/cols))+"%"
+
+                preview.appendChild(p)
+
+                previewNotes.push({
+
+                    element:p,
+                    time:time,
+                    wav:n.wav,
+                    played:false
+
+                })
+
+            }
+
+            function loop(){
+
+                let now=(performance.now()-start)/1000
+
+                for(let n of previewNotes){
+
+                    let y=(now-n.time)*200
+
+                    n.element.style.top=y+"px"
+
+                    if(!n.played && y>=judgeY){
+
+                        playSound(n.wav)
+
+                        n.played=true
+
+                    }
+
+                }
+
+                /* BGA */
+
+                for(let e of bgaEvents){
+
+                    let t=e.row*(beat/4)
+
+                    if(now>=t){
+
+                        document.getElementById("bgaView").src=bmpFiles[e.bmp]
+
+                    }
+
+                }
+
+                requestAnimationFrame(loop)
+
+            }
+
+            loop()
+
+        }
+
+        /* =========================
+        JSON 保存
+        ========================== */
+
+        function saveChart(){
+
+            let chart={
+
+                bpm:parseFloat(document.getElementById("bpmInput").value),
+
+                notes:notes,
+
+                bga:bgaEvents
+
+            }
+
+            let json=JSON.stringify(chart,null,2)
+
+            let blob=new Blob([json],{type:"application/json"})
+
+            let a=document.createElement("a")
+
+            a.href=URL.createObjectURL(blob)
+
+            a.download="chart.json"
+
+            a.click()
+
+        }
+
+        /* =========================
+        JSON 読み込み
+        ========================== */
+
+        document.getElementById("jsonLoader").onchange=function(e){
+
+            let file=e.target.files[0]
+
+            let reader=new FileReader()
+
+            reader.onload=function(){
+
+                let data=JSON.parse(reader.result)
+
+                loadChartData(data)
+
+            }
+
+            reader.readAsText(file)
+
+        }
+
+        function loadChart(){
+
+            document.getElementById("jsonLoader").click()
+
+        }
+
+        function loadChartData(data){
+
+            notes=[]
+            bgaEvents=[]
+
+            gridInner.querySelectorAll(".note").forEach(n=>n.remove())
+            gridInner.querySelectorAll(".bgaNote").forEach(n=>n.remove())
+
+            /* notes */
+
+            for(let n of data.notes){
+
+                selectedWav=n.wav
+
+                addNote(n.lane,n.row)
+
+            }
+
+            /* bga */
+
+            for(let b of data.bga){
+
+                selectedBmp=b.bmp
+
+                addBGA(b.row)
+
+            }
+
+        }
+
+    </script>
+
+</body>
+</html>
