@@ -116,6 +116,33 @@
             background:black;
         }
 
+        .rowLabel{
+            position:absolute;
+            left:-10px;
+            width:35px;
+            font-size:10px;
+            color:#888;
+            text-align:right;
+            pointer-events:none;
+        }
+
+        .selectionBox{
+            position:absolute;
+            border:1px dashed yellow;
+            background:rgba(255,255,0,0.1);
+            pointer-events:none;
+            z-index:100;
+        }
+
+        .cell.selection {
+            background: rgba(255,0,0,0.3); /* 赤半透明 */
+        }
+
+        .note, .rowLabel {
+            user-select: none;
+            pointer-events: auto;
+        }
+
     </style>
 </head>
 
@@ -139,6 +166,11 @@
     <button onclick="saveChart()">JSON保存</button>
     <button onclick="loadChart()">JSON読込</button>
     <input type="file" id="jsonLoader">
+
+    <div style="margin:10px;">
+        <img id="pencilBtn" src="images/pencil.png" style="width:40px; cursor:pointer; border:2px solid white;">
+        <img id="selectBtn" src="images/mausu.png" style="width:40px; cursor:pointer; border:2px solid gray;">
+    </div>
 
     <div id="main">
 
@@ -182,7 +214,7 @@
 
     <script>
 
-        const rows=128
+        const rows=1000
         const cols=10
         const cellH=20
 
@@ -198,47 +230,78 @@
         let selectedWav=null
         let selectedBmp=null
 
+        let scrollY=0
+
+        let selecting = false
+        let selectStart = null
+        let selectionBox = null
+        let selectedNotes = []
+        let clipboard = []
+        let selectionCells = [];
+
+        selectionBox = document.createElement("div")
+        selectionBox.className = "selectionBox"
+        gridInner.appendChild(selectionBox)
+        selectionBox.style.display = "none"
+
+        //モード
+        let mode = "pencil"
+
+        const pencilBtn = document.getElementById("pencilBtn")
+        const selectBtn = document.getElementById("selectBtn")
+
+        pencilBtn.onclick = () => {
+            mode = "pencil"
+            pencilBtn.style.border = "2px solid white"
+            selectBtn.style.border = "2px solid gray"
+            console.log("pencilモード")
+        }
+
+        selectBtn.onclick = () => {
+            mode = "select"
+            selectBtn.style.border = "2px solid white"
+            pencilBtn.style.border = "2px solid gray"
+            console.log("selectモード")
+        }
+
+        grid.addEventListener("contextmenu", e => e.preventDefault())
+
         const audioCtx=new (window.AudioContext||window.webkitAudioContext)()
 
-        /* grid */
-
         for(let r=0;r<rows;r++){
-
             for(let c=0;c<cols;c++){
 
                 let cell=document.createElement("div")
-
                 cell.className="cell"
-
                 cell.style.left=(c*(100/cols))+"%"
 
                 let y=(rows-r-1)*cellH
-
                 cell.style.top=y+"px"
 
                 cell.onclick=function(){
-
+                    if(mode !== "pencil") return
                     if(c==9){
-
                         addBGA(r)
-
                     }else{
-
                         addNote(c,r)
-
                     }
-
                 }
-
                 gridInner.appendChild(cell)
 
+            }
+
+            if(r % 10 === 0){
+                let label = document.createElement("div")
+                label.className = "rowLabel"
+                label.innerText = r
+                let y = (rows - r - 1) * cellH
+                label.style.top = y + "px"
+                gridInner.appendChild(label)
             }
 
         }
 
         gridInner.style.height=(rows*cellH)+"px"
-
-        /* start line */
 
         let startLine=document.createElement("div")
         startLine.className="startLine"
@@ -252,21 +315,22 @@
             let y=(rows-r-1)*cellH
 
             startLine.style.top=y+"px"
+            scrollY = y - (grid.clientHeight - cellH)
 
+            if(scrollY < 0) scrollY = 0
+
+            gridInner.style.top = -scrollY + "px"
         }
 
         startRow.onchange=updateStart
         updateStart()
 
-        /* scroll */
-
-        let scrollY=0
-
+        //上限を定める
         grid.addEventListener("wheel",function(e){
 
             scrollY+=e.deltaY
 
-            if(scrollY<0)scrollY=0
+            //if(scrollY<0)scrollY=0
 
             let max=rows*cellH-600
 
@@ -276,8 +340,195 @@
 
         })
 
-        /* wav load */
+        //範囲指定
 
+        grid.addEventListener("mousedown",(e)=>{
+            if(mode !== "select") return;
+            if(e.button !== 0)return;
+            //if(e.button !== 2) return
+            //if(e.target !== grid && e.target !== gridInner) return
+            console.log("範囲指定")
+
+            selecting = true;
+            const col = Math.floor(e.offsetX / (grid.clientWidth / cols));
+            const row = Math.floor((rows*cellH - e.offsetY + scrollY) / cellH);
+            selectStart = {col, row};
+
+            selectionCells.forEach(cell => cell.classList.remove("selection"));
+            selectionCells = [];
+        })
+
+        grid.addEventListener("mousemove", e => {
+            if(!selecting) return;
+            console.log("移動中")
+
+            const col = Math.floor(e.offsetX / (grid.clientWidth / cols));
+            const row = Math.floor((rows*cellH - e.offsetY + scrollY) / cellH);
+
+            const startCol = Math.min(selectStart.col, col);
+            const endCol   = Math.max(selectStart.col, col);
+            const startRow = Math.min(selectStart.row, row);
+            const endRow   = Math.max(selectStart.row, row);
+
+            selectionCells.forEach(cell => cell.classList.remove("selection"));
+            selectionCells = [];
+
+            document.querySelectorAll(".cell").forEach(cell => {
+                const cellCol = Math.round(parseFloat(cell.style.left) / (grid.clientWidth / cols));
+                const cellRow = Math.round((rows*cellH - parseFloat(cell.style.top)) / cellH - 1);
+
+                if(cellCol >= startCol && cellCol <= endCol && cellRow >= startRow && cellRow <= endRow){
+                        cell.classList.add("selection");
+                   selectionCells.push(cell);
+                }
+            });
+        });
+
+        grid.addEventListener("mouseup", e => {
+            if(!selecting) return;
+            selecting = false;
+            console.log("移動やめる")
+        });
+        /*
+        grid.addEventListener("mouseup", (e)=>{
+            if(!selecting) return
+
+            let colStart = Math.floor(parseFloat(selectionBox.style.left) / (grid.clientWidth / cols));
+            let colEnd   = Math.floor((parseFloat(selectionBox.style.left) + parseFloat(selectionBox.style.width)) / (grid.clientWidth / cols));
+            let rowStart = Math.floor((grid.clientHeight - parseFloat(selectionBox.style.top) - scrollY - parseFloat(selectionBox.style.height)) / cellH);
+            let rowEnd   = Math.floor((grid.clientHeight - parseFloat(selectionBox.style.top) - scrollY) / cellH);
+
+            selectedNotes = [];
+
+            document.querySelectorAll(".note").forEach(note => {
+                let noteCol = Math.round(parseFloat(note.style.left) / (grid.clientWidth / cols));
+                let noteRow = Math.round((rows*cellH - parseFloat(note.style.top)) / cellH - 1);
+
+                if(noteCol >= colStart && noteCol <= colEnd && noteRow >= rowStart && noteRow <= rowEnd){
+                    note.classList.add("selected");
+                    selectedNotes.push(note);
+                } else {
+                    note.classList.remove("selected");
+                }
+            });
+
+            // 範囲選択ボックスは残す
+            selectionBox.style.display = "block";
+
+
+        })
+            */
+
+        grid.addEventListener("mousedown",(e)=>{
+
+            if(mode !== "select") return
+            if(e.button !== 0) return
+            if(selectedNotes.length === 0) return
+
+            dragging = true
+            dragStart = {x:e.clientX, y:e.clientY}
+        })
+
+
+        //ノーツの選択
+        function selectNotes(){
+
+            selectedNotes = []
+
+            let box = selectionBox.getBoundingClientRect()
+
+            document.querySelectorAll(".note").forEach(el=>{
+
+                let rect = el.getBoundingClientRect()
+
+                if(
+                    rect.left < box.right &&
+                    rect.right > box.left &&
+                    rect.top < box.bottom &&
+                    rect.bottom > box.top
+                ){
+                    el.classList.add("selected")
+                    selectedNotes.push(el)
+                }else{
+                    el.classList.remove("selected")
+                }
+
+            })
+        }
+
+        //コピー
+        document.addEventListener("keydown",(e)=>{
+            if(mode !== "select") return
+            
+            if(e.ctrlKey && e.key==="c"){
+
+                clipboard = selectedNotes.map(el=>{
+
+                    return {
+                        lane: parseFloat(el.style.left),
+                        top: parseFloat(el.style.top),
+                        wav: el.innerText
+                    }
+                })
+            }
+        })
+
+        //ペースト
+        document.addEventListener("keydown",(e)=>{
+            if(e.ctrlKey && e.key==="v"){
+                clipboard.forEach(n=>{
+
+                    let note=document.createElement("div")
+                    note.className="note"
+                    note.innerText=n.wav
+                    note.style.left=n.lane+"%"
+                    note.style.top=(n.top - 40)+"px" // 少し上に貼る
+                    gridInner.appendChild(note)
+                })
+            }
+        })
+        
+        //削除
+        document.addEventListener("keydown",(e)=>{
+            if(e.key==="Delete"){
+                selectedNotes.forEach(el=>el.remove())
+                selectedNotes = []
+            }
+        })
+
+        //移動
+        let dragging = false
+        let dragStart = null
+
+        grid.addEventListener("mousedown",(e)=>{
+            if(e.button !== 0) return
+            if(selectedNotes.length===0) return
+
+            dragging = true
+            dragStart = {x:e.clientX, y:e.clientY}
+        })
+
+        grid.addEventListener("mousemove",(e)=>{
+            if(!dragging) return
+
+            let dx = e.clientX - dragStart.x
+            let dy = e.clientY - dragStart.y
+            selectedNotes.forEach(el=>{
+                let top = parseFloat(el.style.top)
+                let left = parseFloat(el.style.left)
+                el.style.top = (top + dy) + "px"
+            })
+            dragStart = {x:e.clientX, y:e.clientY}
+        })
+
+        grid.addEventListener("mouseup",()=>{
+            dragging = false
+        })
+
+        //ここまでが、譜面操作のところ
+        //ここからデータ関連
+
+        //wavデータ読み込み
         wavFolder.onchange=async function(e){
 
             let list=document.getElementById("wavList")
@@ -288,40 +539,29 @@
                 if(!f.name.endsWith(".wav"))continue
 
                 let url=URL.createObjectURL(f)
-
                 wavFiles[f.name]=url
 
                 let arr=await fetch(url).then(r=>r.arrayBuffer())
-
                 wavBuffers[f.name]=await audioCtx.decodeAudioData(arr)
 
                 let item=document.createElement("div")
                 item.innerText=f.name
 
                 item.onclick=function(){
-
                     selectedWav=f.name
-
                 }
 
                 item.ondblclick=function(){
-
                     playSound(f.name)
-
                 }
-
                 list.appendChild(item)
-
             }
-
         }
 
         /* bmp load */
 
         bmpFolder.onchange=function(e){
-
             let list=document.getElementById("bmpList")
-
             list.innerHTML=""
 
             for(let f of e.target.files){
@@ -329,263 +569,165 @@
                 if(!f.name.endsWith(".bmp"))continue
 
                 let url=URL.createObjectURL(f)
-
                 bmpFiles[f.name]=url
-
                 let item=document.createElement("div")
-
                 item.innerText=f.name
 
                 item.onclick=function(){
-
                     selectedBmp=f.name
-
                 }
 
                 list.appendChild(item)
-
             }
-
         }
 
-        /* play sound */
-
+        //音を鳴らす
         function playSound(name){
-
             let src=audioCtx.createBufferSource()
-
             src.buffer=wavBuffers[name]
-
             src.connect(audioCtx.destination)
-
             src.start()
 
         }
 
-        /* note */
-
+        //ノーツ
         function addNote(col,row){
 
             if(!selectedWav)return
 
             let note=document.createElement("div")
-
             note.className="note"
-
             note.innerText=selectedWav
-
             note.style.left=(col*(100/cols))+"%"
-
             let y=(rows-row-1)*cellH
-
             note.style.top=y+"px"
-
             gridInner.appendChild(note)
 
             note.oncontextmenu=function(e){
-
                 e.preventDefault()
-
                 note.remove()
-
                 notes=notes.filter(n=>!(n.lane==col && n.row==row))
-
             }
 
             notes.push({
-
                 lane:col,
                 row:row,
                 wav:selectedWav
-
             })
-
         }
 
-        /* BGA */
-
+        //BGA
         function addBGA(row){
 
             if(!selectedBmp)return
 
             let note=document.createElement("div")
-
             note.className="bgaNote"
-
             note.innerText="BGA"
-
             note.style.left=(9*(100/cols))+"%"
-
             let y=(rows-row-1)*cellH
-
             note.style.top=y+"px"
-
             gridInner.appendChild(note)
 
             note.oncontextmenu=function(e){
-
                 e.preventDefault()
-
                 note.remove()
-
                 bgaEvents=bgaEvents.filter(n=>!(n.row==row))
-
             }
 
             bgaEvents.push({
-
                 row:row,
                 bmp:selectedBmp
-
             })
-
         }
 
-        /* play */
-
+        //PLAYER
         function playChart(){
 
             let bpm=parseFloat(bpmInput.value)
-
             let beat=60/bpm
-
             let start=performance.now()
-
             let judgeY=230
-
             let preview=document.getElementById("preview")
-
             preview.innerHTML='<div class="judge"></div>'
-
             let previewNotes=[]
 
             for(let n of notes){
-
                 let time=n.row*(beat/4)
-
                 let p=document.createElement("div")
 
                 p.className="previewNote"
-
                 p.innerText=""
-
                 p.style.left=(n.lane*(100/cols))+"%"
-
                 preview.appendChild(p)
 
                 previewNotes.push({
-
                     element:p,
                     time:time,
                     wav:n.wav,
                     played:false
-
                 })
-
             }
 
             function loop(){
-
                 let now=(performance.now()-start)/1000
 
                 for(let n of previewNotes){
-
                     let y=(now-n.time)*200
-
                     n.element.style.top=y+"px"
 
                     if(!n.played && y>=judgeY){
-
                         playSound(n.wav)
-
                         n.played=true
-
                     }
-
                 }
 
                 /* BGA */
-
                 for(let e of bgaEvents){
-
                     let t=e.row*(beat/4)
-
                     if(now>=t){
-
                         document.getElementById("bgaView").src=bmpFiles[e.bmp]
-
                     }
-
                 }
-
                 requestAnimationFrame(loop)
-
             }
-
             loop()
-
         }
 
-        /* =========================
-        JSON 保存
-        ========================== */
-
+        //json保存
         function saveChart(){
-
             let chart={
-
                 bpm:parseFloat(document.getElementById("bpmInput").value),
-
                 notes:notes,
-
                 bga:bgaEvents
-
             }
 
             let json=JSON.stringify(chart,null,2)
-
             let blob=new Blob([json],{type:"application/json"})
-
             let a=document.createElement("a")
-
             a.href=URL.createObjectURL(blob)
-
             a.download="chart.json"
-
             a.click()
 
         }
 
-        /* =========================
-        JSON 読み込み
-        ========================== */
-
+        //json読み込み
         document.getElementById("jsonLoader").onchange=function(e){
-
             let file=e.target.files[0]
-
             let reader=new FileReader()
 
             reader.onload=function(){
-
                 let data=JSON.parse(reader.result)
-
                 loadChartData(data)
-
             }
-
             reader.readAsText(file)
-
         }
 
         function loadChart(){
-
             document.getElementById("jsonLoader").click()
-
         }
 
         function loadChartData(data){
-
             notes=[]
             bgaEvents=[]
 
@@ -593,25 +735,16 @@
             gridInner.querySelectorAll(".bgaNote").forEach(n=>n.remove())
 
             /* notes */
-
             for(let n of data.notes){
-
                 selectedWav=n.wav
-
                 addNote(n.lane,n.row)
-
             }
 
             /* bga */
-
             for(let b of data.bga){
-
                 selectedBmp=b.bmp
-
                 addBGA(b.row)
-
             }
-
         }
 
     </script>
