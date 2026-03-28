@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Music Select</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial;
+  background: #0a0f2c;
+  color: white;
+  display: flex;
+  height: 100vh;
+}
+
+#left {
+  flex: 2;
+  padding: 20px;
+}
+
+#right {
+  flex: 1;
+  background: #111;
+  overflow-y: auto;
+}
+
+.song-item {
+  padding: 10px;
+  border-bottom: 1px solid #333;
+  cursor: pointer;
+}
+
+.song-item:hover {
+  background: #1e90ff;
+}
+
+.selected {
+  background: orange !important;
+}
+</style>
+</head>
+
+<body>
+
+<div id="left">
+  <button onclick="pickFolder()">Songsフォルダを選択</button>
+
+  <h2 id="title">---</h2>
+  <div id="genre"></div>
+  <div id="artist"></div>
+  <div id="bpm"></div>
+  <div id="level"></div>
+</div>
+
+<div id="right"></div>
+
+<script>
+let songs = [];
+const right = document.getElementById("right");
+
+// フォルダ選択
+async function pickFolder() {
+  const dirHandle = await window.showDirectoryPicker();
+  songs = [];
+
+  for await (const entry of dirHandle.values()) {
+    if (entry.kind === "directory") {
+      await scanSongFolder(entry);
+    }
+  }
+}
+
+// 曲フォルダをスキャン
+async function scanSongFolder(folderHandle) {
+  for await (const file of folderHandle.values()) {
+    if (file.kind === "file" && file.name.endsWith(".json")) {
+      const fileData = await file.getFile();
+      const text = await fileData.text();
+      const json = JSON.parse(text);
+
+      songs.push(json);
+      addSongToList(json);
+    }
+  }
+}
+
+// 右側に追加
+function addSongToList(json) {
+  const div = document.createElement("div");
+  div.className = "song-item";
+  div.textContent = json.meta.title;
+
+  div.onclick = () => selectSong(div, json);
+
+  right.appendChild(div);
+}
+
+// 選択
+function selectSong(element, json) {
+  document.querySelectorAll(".song-item")
+    .forEach(el => el.classList.remove("selected"));
+
+  element.classList.add("selected");
+
+  document.getElementById("title").textContent = json.meta.title;
+  document.getElementById("genre").textContent = "Genre: " + json.meta.genre;
+  document.getElementById("artist").textContent = "Artist: " + json.meta.artist;
+  document.getElementById("bpm").textContent = "BPM: " + json.meta.bpm;
+  document.getElementById("level").textContent = "Level: " + json.meta.level;
+}
+</script>
+
+</body>
+</html>

@@ -154,22 +154,41 @@
     開始row
     <input id="startRow" value="0">
 
+    ジャンル
+    <input id="genreInput" value="">
+
+    タイトル
+    <input id="titleInput" value="">
+
+    アーティスト
+    <input id="artistInput" value="">
+
+    レベル
+    <input id="levelInput" value="1">
+
+    難易度
+    <select id="difficultyInput">
+        <option value="EASY">EASY</option>
+        <option value="NORMAL">NORMAL</option>
+        <option value="HARD">HARD</option>
+        <option value="ANOTHER">ANOTHER</option>
+    </select>
+
     <br><br>
-
-    WAVフォルダ
-    <input type="file" id="wavFolder" webkitdirectory>
-
-    BMPフォルダ
-    <input type="file" id="bmpFolder" webkitdirectory>
-
-    <button onclick="playChart()">譜面再生</button>
-    <button onclick="saveChart()">JSON保存</button>
-    <button onclick="loadChart()">JSON読込</button>
-    <input type="file" id="jsonLoader">
+    
+    <input type="file" id="wavFolder" webkitdirectory style="display:none">
+    <input type="file" id="bmpFolder" webkitdirectory style="display:none">
+    <input type="file" id="jsonLoader" style="display:none">
 
     <div style="margin:10px;">
+        <img id="musicBtn" src="images/music.png" style="width:40px; cursor:pointer; border:2px solid white;">
+        <img id="videoBtn" src="images/video.png" style="width:40px; cursor:pointer; border:2px solid gray;">
         <img id="pencilBtn" src="images/pencil.png" style="width:40px; cursor:pointer; border:2px solid white;">
         <img id="selectBtn" src="images/mausu.png" style="width:40px; cursor:pointer; border:2px solid gray;">
+        <img id="eraserBtn" src="images/eraser.png" style="width:40px; cursor:pointer; border:2px solid gray;">
+        <img id="saiseiBtn" src="images/saisei.png" style="width:40px; cursor:pointer; border:2px solid gray;">
+        <img id="jsonBtn" src="images/json.png" style="width:40px; cursor:pointer; border:2px solid gray;">
+        <img id="downloadBtn" src="images/download.png" style="width:40px; cursor:pointer; border:2px solid gray;">
     </div>
 
     <div id="main">
@@ -238,6 +257,38 @@
         let selectedNotes = []
         let clipboard = []
         let selectionCells = [];
+
+        //ボタンたち
+        const musicBtn = document.getElementById("musicBtn")
+        const videoBtn = document.getElementById("videoBtn")
+        const saiseiBtn = document.getElementById("saiseiBtn")
+        const jsonBtn = document.getElementById("jsonBtn")
+        const downloadBtn = document.getElementById("downloadBtn")
+
+        // WAV読み込み
+        musicBtn.onclick = () => {
+            document.getElementById("wavFolder").click()
+        }
+
+        // BMP読み込み
+        videoBtn.onclick = () => {
+            document.getElementById("bmpFolder").click()
+        }
+
+        // 再生
+        saiseiBtn.onclick = () => {
+            playChart()
+        }
+
+        // JSON読み込み
+        jsonBtn.onclick = () => {
+            document.getElementById("jsonLoader").click()
+        }
+
+        // JSON保存
+        downloadBtn.onclick = () => {
+            saveChart()
+        }
 
         selectionBox = document.createElement("div")
         selectionBox.className = "selectionBox"
@@ -697,7 +748,14 @@
         //json保存
         function saveChart(){
             let chart={
-                bpm:parseFloat(document.getElementById("bpmInput").value),
+                meta:{
+                    genre: document.getElementById("genreInput").value,
+                    title: document.getElementById("titleInput").value,
+                    artist: document.getElementById("artistInput").value,
+                    bpm: parseFloat(document.getElementById("bpmInput").value),
+                    level: parseInt(document.getElementById("levelInput").value),
+                    difficulty: document.getElementById("difficultyInput").value
+                },
                 notes:notes,
                 bga:bgaEvents
             }
@@ -708,7 +766,6 @@
             a.href=URL.createObjectURL(blob)
             a.download="chart.json"
             a.click()
-
         }
 
         //json読み込み
@@ -733,6 +790,15 @@
 
             gridInner.querySelectorAll(".note").forEach(n=>n.remove())
             gridInner.querySelectorAll(".bgaNote").forEach(n=>n.remove())
+
+            if(data.meta){
+                document.getElementById("genreInput").value = data.meta.genre || ""
+                document.getElementById("titleInput").value = data.meta.title || ""
+                document.getElementById("artistInput").value = data.meta.artist || ""
+                document.getElementById("bpmInput").value = data.meta.bpm || 120
+                document.getElementById("levelInput").value = data.meta.level || 1
+                document.getElementById("difficultyInput").value = data.meta.difficulty || "NORMAL"
+            }
 
             /* notes */
             for(let n of data.notes){
