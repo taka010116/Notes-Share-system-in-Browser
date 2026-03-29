@@ -54,15 +54,6 @@
         .lane.active{
             background:#444;
         }
-        /*
-        .note{
-            position:absolute;
-            width:80%;
-            left:10%;
-            height:18px;
-            background:#00ffff;
-            border-radius:4px;
-        }*/
 
         /* 判定ライン */
 
@@ -74,18 +65,8 @@
             background:yellow;
             left:50%;
             transform:translateX(-50%);
+            z-index: 10;
         }
-
-        /*
-        #judgeImage{
-            position:absolute;
-            bottom:200px;
-            left:50%;
-            transform:translateX(-50%);
-            height:80px;
-            pointer-events:none;
-        }
-        */
 
         /* BGA */
 
@@ -118,6 +99,7 @@
             display:flex;
             align-items:center;
             gap:15px;
+            pointer-events: none;
         }
 
         #judgeImage{
@@ -138,12 +120,41 @@
             width:100%;
             left:0%;
             height:18px;
-            /* background:#00ffff; 削除 */
             border-radius:4px;
             background-image: url('images/note.png');
-            background-size: contain;
+            background-size: 100% 100%;
             background-repeat: no-repeat;
         }
+
+        #fullComboHolder {
+            position: absolute;
+            /* 判定表示(judgeContainer)の少し上になるように調整 */
+            bottom: 280px; 
+            left: 50%;
+            transform: translateX(-50%) scale(2); 
+            z-index: 100;
+            pointer-events: none;
+            opacity: 0;
+            transition: all 0.3s ease-out;
+        }
+
+        #fullComboHolder.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1); /* 定位置へ */
+            /* 登場後にパルスアニメーションを開始 */
+            animation: fcPulse 2s infinite 0.3s ease-in-out; 
+        }
+
+        #fullComboImg {
+            height: 150px;
+            filter: drop-shadow(0 0 10px #fff) drop-shadow(0 0 20px #ff0) drop-shadow(0 0 30px #f0f);
+        }
+
+        /*@keyframes fcPulse {
+            0% { transform: scale(1); filter: drop-shadow(0 0 10px #fff) brightness(1); }
+            50% { transform: scale(1.05); filter: drop-shadow(0 0 15px #fff) brightness(1.2); }
+            100% { transform: scale(1); filter: drop-shadow(0 0 10px #fff) brightness(1); }
+        }*/
 
     </style>
 </head>
@@ -156,30 +167,24 @@
         <input type="file" id="folderInput" webkitdirectory>
 
         スピード  
-        <input type="number" id="speedInput" value="250">
+        <input type="number" id="speedInput" value="400">
 
         <button id="startButton">ゲームスタート</button>
 
     </div>
 
     <div id="container">
-
         <div id="game">
-
             <div id="lanes"></div>
-
             <div class="judgeLine"></div>
-
             <div id="judgeContainer">
-
                 <img id="judgeImage">
-
                 <div id="combo"></div>
-
             </div>
-
             <div id="score">Score:0</div>
-
+            <div id="fullComboHolder">
+                <img src="images/FULLCOMBO.png" id="fullComboImg">
+            </div>
         </div>
 
         <div id="bgaArea">
@@ -190,38 +195,18 @@
 
     <script>
 
-        /* ==============================
-        設定
-        ============================== */
         const numberPos = {
-
-            1:[0,0],
-            2:[270,0],
-            3:[540,0],
-            4:[810,0],
-            5:[1080,0],
-
-            6:[0,270],
-            7:[270,270],
-            8:[540,270],
-            9:[810,270],
-            0:[1080,270]
-
+            1:[0,0], 2:[270,0], 3:[540,0], 4:[810,0], 5:[1080,0],
+            6:[0,270], 7:[270,270], 8:[540,270], 9:[810,270], 0:[1080,270]
         }
 
         const laneCount = 5
-        const lookAhead = 3.0
         let combo = 0
         const comboDiv = document.getElementById("combo")
 
-        /* 対応キー */
 
         const keyMap={
-            "f":0,
-            "g":1,
-            "h":2,
-            "j":3,
-            "k":4
+            "f":0, "g":1, "h":2, "j":3, "k":4
         }
 
         const judgeTiming={
@@ -230,39 +215,75 @@
             bad:0.38
         }
 
-        /* ==============================
-        DOM
-        ============================== */
-
         const lanesDiv=document.getElementById("lanes")
         const judgeImg=document.getElementById("judgeImage")
         const scoreDiv=document.getElementById("score")
         const bga=document.getElementById("bga")
+        const speedInput=document.getElementById("speedInput")
+        const fcHolder = document.getElementById("fullComboHolder")
 
-        /* ==============================
-        レーン生成
-        ============================== */
+        // URLから ?song=canon のようなパラメータを取得
+        const urlParams = new URLSearchParams(window.location.search);
+        const songFolder = urlParams.get('song'); // "canon" などが入る
+
+        window.onload = async function() {
+            if (songFolder) {
+                await loadSongAuto(songFolder);
+            }
+        };
+
+        // フォルダパスを元に自動読み込み
+        async function loadSongAuto(folderName) {
+            const basePath = `songs/${folderName}/`;
+    
+            try {
+                // 1. JSON (譜面) の読み込み
+                const response = await fetch(basePath + "data.json"); // jsonファイル名は固定か、ルールを決めておく
+                chart = await response.json();
+
+                // 2. 音源の読み込み (JSON内のwavリストを回す)
+                // chart.notes や bgmEvents に含まれる wav 名をすべて取得
+                const wavNames = new Set();
+                chart.notes.forEach(n => wavNames.add(n.wav));
+                if(chart.bga) chart.bga.forEach(e => { if(e.bmp) /* 画像のリストも同様 */ {} });
+
+                for (let name of wavNames) {
+                    const res = await fetch(basePath + name);
+                    const arr = await res.arrayBuffer();
+                    wavBuffers[name] = await audioCtx.decodeAudioData(arr);
+                }
+
+                // 3. 画像(BGA)の読み込み
+                if(chart.bga) {
+                    for(let e of chart.bga) {
+                        if(e.bmp && !bmpFiles[e.bmp]) {
+                            bmpFiles[e.bmp] = basePath + e.bmp; // URLオブジェクトの代わりにパスを直接入れる
+                        }
+                    }
+                }
+
+                console.log("自動読み込み完了:", folderName);
+        
+                // 準備ができたら自動スタート、またはボタンを有効化
+                document.getElementById("startButton").innerText = "CLICK TO START";
+            } catch (e) {
+                console.error("読み込み失敗:", e);
+                alert("曲データの読み込みに失敗しました。パスを確認してください。");
+            }
+        }
+
 
         let lanes=[]
 
         for(let i=0;i<laneCount;i++){
-
             let lane=document.createElement("div")
             lane.className="lane"
-
             lanesDiv.appendChild(lane)
-
             lanes.push(lane)
-
             lane.addEventListener("mousedown",()=>{
                 pressLane(i)
             })
-
         }
-
-        /* ==============================
-        Audio
-        ============================== */
 
         const audioCtx=new (window.AudioContext||window.webkitAudioContext)()
 
@@ -270,40 +291,23 @@
         let bmpFiles={}
         let chart=null
 
-        /* ==============================
-        フォルダ読み込み
-        ============================== */
-
+        //フォルダ読み込む
         folderInput.onchange=async function(e){
-
             let files=e.target.files
-
             for(let f of files){
-
                 if(f.name.endsWith(".wav")){
-
                     let arr=await f.arrayBuffer()
                     wavBuffers[f.name]=await audioCtx.decodeAudioData(arr)
-
                 }
-
-                if(f.name.endsWith(".bmp")){
-
+                if(f.name.endsWith(".bmp") || f.name.endsWith(".jpg") || f.name.endsWith(".png")){
                     bmpFiles[f.name]=URL.createObjectURL(f)
-
                 }
-
                 if(f.name.endsWith(".json")){
-
                     let text=await f.text()
                     chart=JSON.parse(text)
-
                 }
-
             }
-
             alert("フォルダ読み込み完了")
-
         }
 
         /* ==============================
@@ -317,40 +321,47 @@
 
         let startTime=0
         let score=0
+        let isPlaying = false;
 
         /* ==============================
         ゲーム開始
         ============================== */
 
         startButton.onclick=function(){
-
             if(!chart){
                 alert("jsonがありません")
                 return
             }
 
             bpm=chart.bpm
-
             notes=[]
             bgmEvents=[]
             bgaEvents=[]
+            score=0
+            combo=0
+            scoreDiv.innerText="Score:0"
+            fcHolder.classList.remove("show");
 
             for(let n of chart.notes){
-
                 if(n.lane<=4){
                     notes.push(JSON.parse(JSON.stringify(n)))
                 }else{
                     bgmEvents.push(JSON.parse(JSON.stringify(n)))
                 }
-
             }
 
-            bgaEvents=chart.bga || []
+            // BGAイベントのリセット
+            if(chart.bga){
+                bgaEvents = chart.bga.map(e => ({...e, played: false}));
+            }
 
+            // 既存ノーツの消去と生成
+            lanes.forEach(l => l.innerHTML = "");
             createNotes()
 
-            startGame()
-
+            startTime=performance.now()/1000
+            isPlaying = true;
+            requestAnimationFrame(update)
         }
 
         /* ==============================
@@ -358,25 +369,19 @@
         ============================== */
 
         function createNotes(){
-
             for(let n of notes){
-
                 let lane=lanes[n.lane]
-
                 let div=document.createElement("div")
                 div.className="note"
-
-                // 画像に置き換え
+                // 画像設定
                 div.style.backgroundImage = "url('images/note.png')"
-                div.style.backgroundSize = "contain"
+                div.style.backgroundSize = "100% 100%"
                 div.style.backgroundRepeat = "no-repeat"
-
+                
                 lane.appendChild(div)
                 n.element=div
                 n.hit=false
-
             }
-
         }
 
         /* ==============================
@@ -384,15 +389,12 @@
         ============================== */
 
         function playSound(name){
-
             let buf=wavBuffers[name]
             if(!buf)return
-
             let src=audioCtx.createBufferSource()
             src.buffer=buf
             src.connect(audioCtx.destination)
             src.start()
-
         }
 
         /* ==============================
@@ -400,13 +402,10 @@
         ============================== */
 
         function flashLane(i){
-
             lanes[i].classList.add("active")
-
             setTimeout(()=>{
                 lanes[i].classList.remove("active")
             },80)
-
         }
 
         /* ==============================
@@ -414,18 +413,12 @@
         ============================== */
 
         function playNextNoteSound(lane){
-
             for(let n of notes){
-
                 if(!n.hit && n.lane==lane){
-
                     playSound(n.wav)
                     return
-
                 }
-
             }
-
         }
 
         /* ==============================
@@ -433,13 +426,9 @@
         ============================== */
 
         document.addEventListener("keydown",function(e){
-
             let lane=keyMap[e.key]
-
             if(lane===undefined)return
-
             pressLane(lane)
-
         })
 
         /* ==============================
@@ -447,52 +436,52 @@
         ============================== */
 
         function pressLane(lane){
-
             flashLane(lane)
-
             playNextNoteSound(lane)
 
             let now=performance.now()/1000-startTime
             let beat=60/bpm
 
             for(let n of notes){
-
                 if(n.hit)continue
                 if(n.lane!=lane)continue
 
                 let t=n.row*(beat/4)
-
                 let diff=now-t
-
                 let j=judge(diff)
 
                 if(j){
-
                     n.hit=true
-
                     showJudge(j)
-
                     if(j==="GREAT" || j==="GOOD"){
-
                         combo++
-
                     }else{
-
                         combo=0
-
                     }
-
                     drawCombo()
-
                     score+=100
                     scoreDiv.innerText="Score:"+score
-
                     n.element.remove()
-
+                    checkFullCombo();
                     return
-
                 }
+            }
+        }
 
+        //古コンボ関数
+        function checkFullCombo() {
+            // 1. まだ叩かれていないノーツがあるかチェック
+            const hasRemaining = notes.some(n => !n.hit);
+            
+            // まだノーツがあるなら何もしない
+            if (hasRemaining) return;
+
+            // 2. すべて叩いた時点で、コンボ数がノーツ総数と一致するかチェック
+            // (MISSが1回でもあれば、combo数は総数より少なくなる)
+            if (combo === notes.length && combo > 0) {
+                // クールに表示
+                fcHolder.classList.add("show");
+                // 必要なら専用のSEを鳴らす（playSound("fullcombo.wav")など）
             }
         }
 
@@ -501,63 +490,35 @@
         ============================== */
 
         function judge(diff){
-
-            diff=Math.abs(diff)
-
-            if(diff<=judgeTiming.great) return "GREAT"
-            if(diff<=judgeTiming.good) return "GOOD"
-            if(diff<=judgeTiming.bad) return "BAD"
-
+            let adiff=Math.abs(diff)
+            if(adiff<=judgeTiming.great) return "GREAT"
+            if(adiff<=judgeTiming.good) return "GOOD"
+            if(adiff<=judgeTiming.bad) return "BAD"
             return null
-
         }
 
         function showJudge(type){
-
             judgeImg.src="images/"+type+".png"
-
             drawCombo()
-
-            setTimeout(()=>{
+            // 既存のタイマーがあればクリア（連続ヒット対策）
+            clearTimeout(window.judgeTimer);
+            window.judgeTimer = setTimeout(()=>{
                 judgeImg.src=""
                 comboDiv.innerHTML = ""
-            },200)
-
+            },500)
         }
 
         //コンボ描画
         function drawCombo(){
-
             comboDiv.innerHTML=""
-
             if(combo<=0) return
-
             let text = combo.toString()
-
             for(let c of text){
-
                 let img = document.createElement("img")
-
                 img.src = "images/" + c + ".png"
-
                 img.className = "comboDigit"
-
                 comboDiv.appendChild(img)
-
             }
-
-        }
-
-        /* ==============================
-        ゲーム開始
-        ============================== */
-
-        function startGame(){
-
-            startTime=performance.now()/1000
-
-            requestAnimationFrame(update)
-
         }
 
         /* ==============================
@@ -565,76 +526,66 @@
         ============================== */
 
         function update(){
+            if(!isPlaying) return;
 
             let now=performance.now()/1000-startTime
             let beat=60/bpm
-            let speed=parseFloat(speedInput.value)
+            let speed=parseFloat(speedInput.value) || 300 // px/sec
 
-            /* ノーツ */
+            /* ノーツの描画更新 */
+            const laneHeight = lanesDiv.clientHeight;
+            const judgeLinePos = 120; // bottom: 120px
 
             for(let n of notes){
-
                 if(n.hit)continue
 
                 let t=n.row*(beat/4)
+                let diff=t-now // 判定ラインに届くまでの時間
 
-                let diff=t-now
+                // 画面内に現れるべきタイミング（便宜上、2秒前くらいから描画）
+                if(diff > 2.0) {
+                    n.element.style.display = "none";
+                    continue;
+                }
+                n.element.style.display = "block";
 
-                if(diff>lookAhead) continue
+                // 判定ライン(bottom:120)からの距離 = 時間差 * 速度
+                let yFromBottom = judgeLinePos + (diff * speed);
+                
+                // CSSのtopに変換 (上からの距離 = 全体高 - 下からの距離 - ノーツ高)
+                n.element.style.top = (laneHeight - yFromBottom - 18) + "px";
 
-                let y=(1-(diff/lookAhead))*600
-
-                n.element.style.top=y+"px"
-
-                if(diff<-judgeTiming.bad){
-
+                // 見逃し判定
+                if(diff < -judgeTiming.bad){
                     n.hit=true
-
                     showJudge("MISS")
-
                     combo=0
                     drawCombo()
-
                     n.element.remove()
-
                 }
-
             }
 
             /* BGM */
-
             for(let b of bgmEvents){
-
                 if(b.played)continue
-
                 let t=b.row*(beat/4)
-
                 if(now>=t){
-
                     playSound(b.wav)
-
                     b.played=true
-
                 }
-
             }
 
             /* BGA */
-
             for(let e of bgaEvents){
-
+                if(e.played) continue;
                 let t=e.row*(beat/4)
-
                 if(now>=t){
-
-                    bga.src=bmpFiles[e.bmp]
-
+                    if(bmpFiles[e.bmp]) bga.src=bmpFiles[e.bmp]
+                    e.played = true;
                 }
-
             }
 
             requestAnimationFrame(update)
-
         }
 
     </script>
