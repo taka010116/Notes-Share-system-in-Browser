@@ -4,7 +4,8 @@
     "title": "Canon",
     "artist": "Johann Pachelbel",
     "bpm": 184,
-    "level": 4
+    "level": 4,
+    "difficulty": "NORMAL"
   },
   "notes": [
     {
@@ -193,15 +194,101 @@
       "wav": "lowG.wav"
     },
     {
-      "lane": 1,
-      "row": 125,
-      "wav": "E.wav"
-    },
-    {
       "lane": 2,
       "row": 122,
       "wav": "lowF#.wav"
+    },
+    {
+      "lane": 1,
+      "row": 125,
+      "wav": "lowE.wav"
+    },
+    {
+      "lane": 2,
+      "row": 128,
+      "wav": "lowF#.wav"
+    },
+    {
+      "lane": 0,
+      "row": 134,
+      "wav": "lowD.wav"
+    },
+    {
+      "lane": 1,
+      "row": 131,
+      "wav": "lowE.wav"
+    },
+    {
+      "lane": 1,
+      "row": 137,
+      "wav": "lowE.wav"
+    },
+    {
+      "lane": 3,
+      "row": 143,
+      "wav": "lowG.wav"
+    },
+    {
+      "lane": 4,
+      "row": 146,
+      "wav": "Alow.wav"
+    },
+    {
+      "lane": 3,
+      "row": 149,
+      "wav": "B.wav"
+    },
+    {
+      "lane": 2,
+      "row": 140,
+      "wav": "lowF#.wav"
+    },
+    {
+      "lane": 5,
+      "row": 128,
+      "wav": "codehiD.wav"
     }
   ],
-  "bga": []
+  "bga": [
+    {
+      "row": 8,
+      "bmp": "sea1.bmp"
+    },
+    {
+      "row": 10,
+      "bmp": "sea2.bmp"
+    },
+    {
+      "row": 12,
+      "bmp": "sea3.bmp"
+    },
+    {
+      "row": 14,
+      "bmp": "sea4.bmp"
+    },
+    {
+      "row": 16,
+      "bmp": "sea5.bmp"
+    },
+    {
+      "row": 18,
+      "bmp": "sea6.bmp"
+    },
+    {
+      "row": 20,
+      "bmp": "sea7.bmp"
+    },
+    {
+      "row": 22,
+      "bmp": "sea8.bmp"
+    },
+    {
+      "row": 24,
+      "bmp": "sea9.bmp"
+    },
+    {
+      "row": 26,
+      "bmp": "sea10.bmp"
+    }
+  ]
 }
