@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>BM26</title>
+
+    <style>
+
+        body{
+            margin:0;
+            background:black;
+            color:white;
+            font-family:sans-serif;
+            overflow:hidden;
+        }
+
+        #topbar{
+            background:#111;
+            padding:10px;
+        }
+
+        #container{
+            display:flex;
+            height:calc(100vh - 60px);
+        }
+
+        /* GAME */
+
+        #game{
+            width:60%;
+            position:relative;
+            background:#000;
+        }
+
+        #lanes{
+            position:absolute;
+            left:50%;
+            transform:translateX(-50%);
+            width:350px;
+            height:100%;
+            display:flex;
+        }
+
+        .lane{
+            flex:1;
+            border-left:1px solid #333;
+            border-right:1px solid #333;
+            position:relative;
+            overflow:hidden;
+            background:#000;
+            transition:background 0.05s;
+        }
+
+        .lane.active{
+            background:#444;
+        }
+
+        /* 判定ライン */
+
+        .judgeLine{
+            position:absolute;
+            bottom:120px;
+            width:350px;
+            height:4px;
+            background:yellow;
+            left:50%;
+            transform:translateX(-50%);
+            z-index: 10;
+        }
+
+        /* BGA */
+
+        #bgaArea{
+            width:40%;
+            background:#000;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+        }
+
+        #bga{
+            width:100%;
+            height:100%;
+            object-fit:contain;
+        }
+
+        #score{
+            position:absolute;
+            top:10px;
+            left:10px;
+            font-size:20px;
+        }
+
+        #judgeContainer{
+            position:absolute;
+            bottom:200px;
+            left:50%;
+            transform:translateX(-50%);
+            display:flex;
+            align-items:center;
+            gap:15px;
+            pointer-events: none;
+        }
+
+        #judgeImage{
+            height:180px;
+        }
+
+        #combo{
+            display:flex;
+            align-items:center;
+        }
+
+        .comboDigit{
+            height:60px;
+        }
+
+        .note{
+            position:absolute;
+            width:100%;
+            left:0%;
+            height:18px;
+            border-radius:4px;
+            background-image: url('images/note.png');
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+        }
+
+        #fullComboHolder {
+            position: absolute;
+            /* 判定表示(judgeContainer)の少し上になるように調整 */
+            bottom: 280px; 
+            left: 50%;
+            transform: translateX(-50%) scale(2); 
+            z-index: 100;
+            pointer-events: none;
+            opacity: 0;
+            transition: all 0.3s ease-out;
+        }
+
+        #fullComboHolder.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1); /* 定位置へ */
+            /* 登場後にパルスアニメーションを開始 */
+            animation: fcPulse 2s infinite 0.3s ease-in-out; 
+        }
+
+        #fullComboImg {
+            height: 150px;
+            filter: drop-shadow(0 0 10px #fff) drop-shadow(0 0 20px #ff0) drop-shadow(0 0 30px #f0f);
+        }
+
+        /*@keyframes fcPulse {
+            0% { transform: scale(1); filter: drop-shadow(0 0 10px #fff) brightness(1); }
+            50% { transform: scale(1.05); filter: drop-shadow(0 0 15px #fff) brightness(1.2); }
+            100% { transform: scale(1); filter: drop-shadow(0 0 10px #fff) brightness(1); }
+        }*/
+
+    </style>
+</head>
+
+<body>
+
+    <div id="topbar">
+
+        フォルダ選択  
+        <input type="file" id="folderInput" webkitdirectory>
+
+        スピード  
+        <input type="number" id="speedInput" value="400">
+
+        <button id="startButton">ゲームスタート</button>
+
+    </div>
+
+    <div id="container">
+        <div id="game">
+            <div id="lanes"></div>
+            <div class="judgeLine"></div>
+            <div id="judgeContainer">
+                <img id="judgeImage">
+                <div id="combo"></div>
+            </div>
+            <div id="score">Score:0</div>
+            <div id="fullComboHolder">
+                <img src="images/FULLCOMBO.png" id="fullComboImg">
+            </div>
+        </div>
+
+        <div id="bgaArea">
+            <img id="bga">
+        </div>
+
+    </div>
+
+    <script>
+
+        const numberPos = {
+            1:[0,0], 2:[270,0], 3:[540,0], 4:[810,0], 5:[1080,0],
+            6:[0,270], 7:[270,270], 8:[540,270], 9:[810,270], 0:[1080,270]
+        }
+
+        const laneCount = 5
+        let combo = 0
+        const comboDiv = document.getElementById("combo")
+
+
+        const keyMap={
+            "f":0, "g":1, "h":2, "j":3, "k":4
+        }
+
+        const judgeTiming={
+            great:0.10,
+            good:0.20,
+            bad:0.38
+        }
+
+        const lanesDiv=document.getElementById("lanes")
+        const judgeImg=document.getElementById("judgeImage")
+        const scoreDiv=document.getElementById("score")
+        const bga=document.getElementById("bga")
+        const speedInput=document.getElementById("speedInput")
+        const fcHolder = document.getElementById("fullComboHolder")
+
+        // URLから ?song=canon のようなパラメータを取得
+        const urlParams = new URLSearchParams(window.location.search);
+        const songFolder = urlParams.get('song'); // "canon" などが入る
+
+        window.onload = async function() {
+            if (songFolder) {
+                await loadSongAuto(songFolder);
+            }
+        };
+
+        // フォルダパスを元に自動読み込み
+        async function loadSongAuto(folderName) {
+            const basePath = `songs/${folderName}/`;
+    
+            try {
+                // 1. JSON (譜面) の読み込み
+                const response = await fetch(basePath + "data.json"); // jsonファイル名は固定か、ルールを決めておく
+                chart = await response.json();
+
+                // 2. 音源の読み込み (JSON内のwavリストを回す)
+                // chart.notes や bgmEvents に含まれる wav 名をすべて取得
+                const wavNames = new Set();
+                chart.notes.forEach(n => wavNames.add(n.wav));
+                if(chart.bga) chart.bga.forEach(e => { if(e.bmp) /* 画像のリストも同様 */ {} });
+
+                for (let name of wavNames) {
+                    const res = await fetch(basePath + name);
+                    const arr = await res.arrayBuffer();
+                    wavBuffers[name] = await audioCtx.decodeAudioData(arr);
+                }
+
+                // 3. 画像(BGA)の読み込み
+                if(chart.bga) {
+                    for(let e of chart.bga) {
+                        if(e.bmp && !bmpFiles[e.bmp]) {
+                            bmpFiles[e.bmp] = basePath + e.bmp; // URLオブジェクトの代わりにパスを直接入れる
+                        }
+                    }
+                }
+
+                console.log("自動読み込み完了:", folderName);
+        
+                // 準備ができたら自動スタート、またはボタンを有効化
+                document.getElementById("startButton").innerText = "CLICK TO START";
+            } catch (e) {
+                console.error("読み込み失敗:", e);
+                alert("曲データの読み込みに失敗しました。パスを確認してください。");
+            }
+        }
+
+
+        let lanes=[]
+
+        for(let i=0;i<laneCount;i++){
+            let lane=document.createElement("div")
+            lane.className="lane"
+            lanesDiv.appendChild(lane)
+            lanes.push(lane)
+            lane.addEventListener("mousedown",()=>{
+                pressLane(i)
+            })
+        }
+
+        const audioCtx=new (window.AudioContext||window.webkitAudioContext)()
+
+        let wavBuffers={}
+        let bmpFiles={}
+        let chart=null
+
+        //フォルダ読み込む
+        folderInput.onchange=async function(e){
+            let files=e.target.files
+            for(let f of files){
+                if(f.name.endsWith(".wav")){
+                    let arr=await f.arrayBuffer()
+                    wavBuffers[f.name]=await audioCtx.decodeAudioData(arr)
+                }
+                if(f.name.endsWith(".bmp") || f.name.endsWith(".jpg") || f.name.endsWith(".png")){
+                    bmpFiles[f.name]=URL.createObjectURL(f)
+                }
+                if(f.name.endsWith(".json")){
+                    let text=await f.text()
+                    chart=JSON.parse(text)
+                }
+            }
+            alert("フォルダ読み込み完了")
+        }
+
+        /* ==============================
+        譜面
+        ============================== */
+
+        let notes=[]
+        let bgaEvents=[]
+        let bgmEvents=[]
+        let bpm=120
+
+        let startTime=0
+        let score=0
+        let isPlaying = false;
+
+        /* ==============================
+        ゲーム開始
+        ============================== */
+
+        startButton.onclick=function(){
+            if(!chart){
+                alert("jsonがありません")
+                return
+            }
+
+            bpm = chart.meta.bpm
+            notes=[]
+            bgmEvents=[]
+            bgaEvents=[]
+            score=0
+            combo=0
+            scoreDiv.innerText="Score:0"
+            fcHolder.classList.remove("show");
+
+            for(let n of chart.notes){
+                if(n.lane<=4){
+                    notes.push(JSON.parse(JSON.stringify(n)))
+                }else{
+                    bgmEvents.push(JSON.parse(JSON.stringify(n)))
+                }
+            }
+
+            // BGAイベントのリセット
+            if(chart.bga){
+                bgaEvents = chart.bga.map(e => ({...e, played: false}));
+            }
+
+            // 既存ノーツの消去と生成
+            lanes.forEach(l => l.innerHTML = "");
+            createNotes()
+
+            startTime=performance.now()/1000
+            isPlaying = true;
+            requestAnimationFrame(update)
+        }
+
+        /* ==============================
+        ノーツ生成
+        ============================== */
+
+        function createNotes(){
+            for(let n of notes){
+                let lane=lanes[n.lane]
+                let div=document.createElement("div")
+                div.className="note"
+                // 画像設定
+                div.style.backgroundImage = "url('images/note.png')"
+                div.style.backgroundSize = "100% 100%"
+                div.style.backgroundRepeat = "no-repeat"
+                
+                lane.appendChild(div)
+                n.element=div
+                n.hit=false
+            }
+        }
+
+        /* ==============================
+        音再生
+        ============================== */
+
+        function playSound(name){
+            let buf=wavBuffers[name]
+            if(!buf)return
+            let src=audioCtx.createBufferSource()
+            src.buffer=buf
+            src.connect(audioCtx.destination)
+            src.start()
+        }
+
+        /* ==============================
+        レーン発光
+        ============================== */
+
+        function flashLane(i){
+            lanes[i].classList.add("active")
+            setTimeout(()=>{
+                lanes[i].classList.remove("active")
+            },80)
+        }
+
+        /* ==============================
+        次ノーツ音
+        ============================== */
+
+        function playNextNoteSound(lane){
+            for(let n of notes){
+                if(!n.hit && n.lane==lane){
+                    playSound(n.wav)
+                    return
+                }
+            }
+        }
+
+        /* ==============================
+        キー入力
+        ============================== */
+
+        document.addEventListener("keydown",function(e){
+            let lane=keyMap[e.key]
+            if(lane===undefined)return
+            pressLane(lane)
+        })
+
+        /* ==============================
+        レーン押下処理
+        ============================== */
+
+        function pressLane(lane){
+            flashLane(lane)
+            playNextNoteSound(lane)
+
+            let now=performance.now()/1000-startTime
+            let beat=60/bpm
+
+            for(let n of notes){
+                if(n.hit)continue
+                if(n.lane!=lane)continue
+
+                let t=n.row*(beat/4)
+                let diff=now-t
+                let j=judge(diff)
+
+                if(j){
+                    n.hit=true
+                    showJudge(j)
+                    if(j==="GREAT" || j==="GOOD"){
+                        combo++
+                    }else{
+                        combo=0
+                    }
+                    drawCombo()
+                    score+=100
+                    scoreDiv.innerText="Score:"+score
+                    n.element.remove()
+                    checkFullCombo();
+                    return
+                }
+            }
+        }
+
+        console.log("notes:", notes.length)
+        console.log("laneHeight:", lanesDiv.clientHeight)
+        console.log("first note:", notes[0])
+
+        //古コンボ関数
+        function checkFullCombo() {
+            // 1. まだ叩かれていないノーツがあるかチェック
+            const hasRemaining = notes.some(n => !n.hit);
+            
+            // まだノーツがあるなら何もしない
+            if (hasRemaining) return;
+
+            // 2. すべて叩いた時点で、コンボ数がノーツ総数と一致するかチェック
+            // (MISSが1回でもあれば、combo数は総数より少なくなる)
+            if (combo === notes.length && combo > 0) {
+                // クールに表示
+                fcHolder.classList.add("show");
+                // 必要なら専用のSEを鳴らす（playSound("fullcombo.wav")など）
+            }
+        }
+
+        /* ==============================
+        判定
+        ============================== */
+
+        function judge(diff){
+            let adiff=Math.abs(diff)
+            if(adiff<=judgeTiming.great) return "GREAT"
+            if(adiff<=judgeTiming.good) return "GOOD"
+            if(adiff<=judgeTiming.bad) return "BAD"
+            return null
+        }
+
+        function showJudge(type){
+            judgeImg.src="images/"+type+".png"
+            drawCombo()
+            // 既存のタイマーがあればクリア（連続ヒット対策）
+            clearTimeout(window.judgeTimer);
+            window.judgeTimer = setTimeout(()=>{
+                judgeImg.src=""
+                comboDiv.innerHTML = ""
+            },500)
+        }
+
+        //コンボ描画
+        function drawCombo(){
+            comboDiv.innerHTML=""
+            if(combo<=0) return
+            let text = combo.toString()
+            for(let c of text){
+                let img = document.createElement("img")
+                img.src = "images/" + c + ".png"
+                img.className = "comboDigit"
+                comboDiv.appendChild(img)
+            }
+        }
+
+        /* ==============================
+        ゲームループ
+        ============================== */
+
+        function update(){
+            if(!isPlaying) return;
+
+            let now=performance.now()/1000-startTime
+            let beat=60/bpm
+            let speed=parseFloat(speedInput.value) || 300 // px/sec
+
+            /* ノーツの描画更新 */
+            const laneHeight = lanesDiv.clientHeight;
+            const judgeLinePos = 120; // bottom: 120px
+
+            for(let n of notes){
+                if(n.hit)continue
+
+                let t=n.row*(beat/4)
+                let diff=t-now // 判定ラインに届くまでの時間
+
+                // 画面内に現れるべきタイミング（便宜上、2秒前くらいから描画）
+                if(diff > 2.0) {
+                    n.element.style.display = "none";
+                    continue;
+                }
+                n.element.style.display = "block";
+
+                // 判定ライン(bottom:120)からの距離 = 時間差 * 速度
+                let yFromBottom = judgeLinePos + (diff * speed);
+                
+                // CSSのtopに変換 (上からの距離 = 全体高 - 下からの距離 - ノーツ高)
+                n.element.style.top = (laneHeight - yFromBottom - 18) + "px";
+
+                // 見逃し判定
+                if(diff < -judgeTiming.bad){
+                    n.hit=true
+                    showJudge("MISS")
+                    combo=0
+                    drawCombo()
+                    n.element.remove()
+                }
+            }
+
+            /* BGM */
+            for(let b of bgmEvents){
+                if(b.played)continue
+                let t=b.row*(beat/4)
+                if(now>=t){
+                    playSound(b.wav)
+                    b.played=true
+                }
+            }
+
+            /* BGA */
+            for(let e of bgaEvents){
+                if(e.played) continue;
+                let t=e.row*(beat/4)
+                if(now>=t){
+                    if(bmpFiles[e.bmp]) bga.src=bmpFiles[e.bmp]
+                    e.played = true;
+                }
+            }
+
+            requestAnimationFrame(update)
+        }
+
+    </script>
+
+</body>
+</html>
