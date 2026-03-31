@@ -143,15 +143,6 @@
             pointer-events: auto;
         }
 
-        .previewStartLine{
-            position:absolute;
-            width:100%;
-            height:3px;
-            background:lime;
-            z-index:50;
-            cursor:pointer;
-        }
-
     </style>
 </head>
 
@@ -243,13 +234,15 @@
     <script>
 
         const rows=1000
-        const cols=10
+        const cols=15
         const cellH=20
 
         const gridInner=document.getElementById("gridInner")
 
         let notes=[]
         let bgaEvents=[]
+        let bgmNotes = []
+
 
         let wavBuffers={}
         let wavFiles={}
@@ -267,6 +260,7 @@
         let clipboard = []
         let selectionCells = [];
 
+        
         //ボタンたち
         const musicBtn = document.getElementById("musicBtn")
         const videoBtn = document.getElementById("videoBtn")
@@ -340,10 +334,14 @@
 
                 cell.onclick=function(){
                     if(mode !== "pencil") return
-                    if(c==9){
-                        addBGA(r)
-                    }else{
-                        addNote(c,r)
+                    if(c <= 9){
+                        addNote(c, r)
+                    }
+                    else if(c <= 13){
+                        addBGM(c, r)
+                    }
+                    else{
+                        addBGA(r) 
                     }
                 }
                 gridInner.appendChild(cell)
@@ -367,44 +365,6 @@
         startLine.className="startLine"
 
         gridInner.appendChild(startLine)
-
-        let previewStartRow = 0
-
-        let previewLine = document.createElement("div")
-        previewLine.className = "previewStartLine"
-        gridInner.appendChild(previewLine)
-
-        function updatePreviewLine(){
-            let y = (rows - previewStartRow - 1) * cellH
-            previewLine.style.top = y + "px"
-        }
-        updatePreviewLine()
-
-        let draggingPreviewLine = false
-
-        previewLine.addEventListener("mousedown", (e)=>{
-            e.stopPropagation()
-            draggingPreviewLine = true
-        })
-
-        document.addEventListener("mousemove", (e)=>{
-            if(!draggingPreviewLine) return
-
-            let rect = grid.getBoundingClientRect()
-            let y = e.clientY - rect.top + scrollY
-
-            let row = Math.floor((rows*cellH - y) / cellH)
-            if(row < 0) row = 0
-            if(row >= rows) row = rows - 1
-
-            previewStartRow = row
-            updatePreviewLine()
-        })  
-
-        document.addEventListener("mouseup", ()=>{
-            draggingPreviewLine = false
-        })
-
 
         function updateStart(){
 
@@ -739,69 +699,95 @@
             })
         }
 
+
+        function addBGM(col,row){
+
+            if(!selectedWav)return
+
+            let note=document.createElement("div")
+            note.className="note"
+            note.style.background="lime"
+            note.innerText="BGM"
+
+            note.style.left=(col*(100/cols))+"%"
+            let y=(rows-row-1)*cellH
+            note.style.top=y+"px"
+
+            gridInner.appendChild(note)
+
+            note.oncontextmenu=function(e){
+                e.preventDefault()
+                note.remove()
+                bgmNotes=bgmNotes.filter(n=>!(n.lane==col && n.row==row))
+            }
+
+            bgmNotes.push({
+                lane:col,
+                row:row,
+                wav:selectedWav
+            })
+        }
+
         //PLAYER
         function playChart(){
 
-            let bpm = parseFloat(bpmInput.value)
-            let beat = 60 / bpm
-
-            let startOffset = previewStartRow * (beat / 4)
-            let start = performance.now()
-            let preview = document.getElementById("preview")
-            preview.innerHTML = '<div class="judge"></div>'
-
-            let previewNotes = []
-
-            const speed = 200
-            const judgeY = 230 
-            const coolTime = judgeY / speed 
+            let bpm=parseFloat(bpmInput.value)
+            let beat=60/bpm
+            let start=performance.now()
+            let judgeY=230
+            let preview=document.getElementById("preview")
+            preview.innerHTML='<div class="judge"></div>'
+            let previewNotes=[]
 
             for(let n of notes){
+                let time=n.row*(beat/4)
+                let p=document.createElement("div")
+                /*
+                if(!n.played && now>=t){
+                    playSound(n.wav)
+                    n.played=true
+                }*/
 
-                let originalTime = n.row * (beat / 4)
-                let shiftedTime = originalTime - startOffset
-
-                if(shiftedTime < 0) continue
-
-                let p = document.createElement("div")
-                p.className = "previewNote"
-                p.style.left = (n.lane * (100/cols)) + "%"
+                p.className="previewNote"
+                p.innerText=""
+                p.style.left=(n.lane*(100/cols))+"%"
                 preview.appendChild(p)
 
                 previewNotes.push({
-                    element: p,
-                    time: shiftedTime,
-                    wav: n.wav,
-                    played: false
+                    element:p,
+                    time:time,
+                    wav:n.wav,
+                    played:false
                 })
             }
 
             function loop(){
-                let now = (performance.now() - start) / 1000
+                let now=(performance.now()-start)/1000
 
                 for(let n of previewNotes){
+                    let y=(now-n.time)*200
+                    n.element.style.top=y+"px"
 
-                    let y = (now - n.time + coolTime) * speed
-                    n.element.style.top = y + "px"
-
-                    // ★ 判定ライン到達で再生
-                    if(!n.played && now >= n.time){
+                    if(!n.played && y>=judgeY){
                         playSound(n.wav)
-                        n.played = true
+                        n.played=true
+                    }
+                }
+
+                /* ★ BGM（これを追加） */
+                for(let n of bgmNotes){
+                    let t=n.row*(beat/4)
+                    if(!n.played && now>=t){
+                        playSound(n.wav)
+                        n.played=true
                     }
                 }
 
                 /* BGA */
                 for(let e of bgaEvents){
-
-                    let t = e.row * (beat/4)
-                    let shifted = t - startOffset
-
-                    if(shifted < 0) continue
-                    if(!bmpFiles[e.bmp]) continue
-
-                    if(now >= shifted){
-                        document.getElementById("bgaView").src = bmpFiles[e.bmp]
+                    let t=e.row*(beat/4)
+                    if(now>=t){
+                        document.getElementById("bgaView").src=bmpFiles[e.bmp]
                     }
                 }
                 requestAnimationFrame(loop)
@@ -821,7 +807,8 @@
                     difficulty: document.getElementById("difficultyInput").value
                 },
                 notes:notes,
-                bga:bgaEvents
+                bga:bgaEvents,
+                bgm:bgmNotes,
             }
 
             let json=JSON.stringify(chart,null,2)
@@ -851,6 +838,7 @@
         function loadChartData(data){
             notes=[]
             bgaEvents=[]
+            bgmNotes=[]
 
             gridInner.querySelectorAll(".note").forEach(n=>n.remove())
             gridInner.querySelectorAll(".bgaNote").forEach(n=>n.remove())
@@ -864,16 +852,46 @@
                 document.getElementById("difficultyInput").value = data.meta.difficulty || "NORMAL"
             }
 
+            let is5Key = true
+
+            if(data.notes){
+                for(let n of data.notes){
+                    if(n.lane > 4){
+                        is5Key = false
+                        break
+                    }
+                }
+            }
+
             /* notes */
             for(let n of data.notes){
+
                 selectedWav=n.wav
-                addNote(n.lane,n.row)
+
+                let lane = n.lane
+
+                // ★ 旧5鍵なら右側へ移動
+                if(is5Key){
+                    lane = lane + 5
+                }
+
+                addNote(lane, n.row)
+            }
+
+            /* bgm */
+            if(data.bgm){
+                for(let n of data.bgm){
+                    selectedWav=n.wav
+                    addBGM(n.lane,n.row)
+                }
             }
 
             /* bga */
-            for(let b of data.bga){
-                selectedBmp=b.bmp
-                addBGA(b.row)
+            if(data.bga){
+                for(let b of data.bga){
+                    selectedBmp=b.bmp
+                    addBGA(b.row)
+                }
             }
         }
 
