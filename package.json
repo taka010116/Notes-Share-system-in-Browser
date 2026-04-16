@@ -1,0 +1,25 @@
+{
+  "name": "iidx",
+  "version": "1.0.0",
+  "description": "ブラウザで完結する、簡易的な演奏ゲームを作りたい。\r BMSのように、ノーツとwavファイルを紐づけることで演奏感を実装します。\r まだまだ開発途中ですが、大まかな基盤を作成しました。",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/taka010116/Notes-Share-system-in-Browser.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/taka010116/Notes-Share-system-in-Browser/issues"
+  },
+  "homepage": "https://github.com/taka010116/Notes-Share-system-in-Browser#readme",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}

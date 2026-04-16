@@ -2,61 +2,128 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>Music Select</title>
+<title>MUSIC SELECT</title>
 
 <style>
+* { box-sizing: border-box; }
 body {
   margin: 0;
-  font-family: Arial;
-  background: #0a0f2c;
-  color: white;
+  font-family: 'Segoe UI', sans-serif;
+  background: #000;
+  color: #00ffff;
   display: flex;
   height: 100vh;
+  overflow: hidden;
 }
 
+/* 背景演出 */
+body::before {
+  content: "";
+  position: fixed;
+  width: 200%;
+  height: 200%;
+  background:
+    repeating-linear-gradient(90deg, rgba(0,255,255,0.05) 0 1px, transparent 1px 80px),
+    repeating-linear-gradient(0deg, rgba(0,255,255,0.03) 0 1px, transparent 1px 80px);
+  animation: moveGrid 20s linear infinite;
+}
+
+@keyframes moveGrid {
+  from { transform: translate(0,0); }
+  to { transform: translate(-200px,-200px); }
+}
+
+/* レイアウト */
 #left {
   flex: 2;
-  padding: 20px;
+  padding: 30px;
+  position: relative;
+  z-index: 2;
 }
 
 #right {
   flex: 1;
-  background: #111;
+  background: rgba(0,0,0,0.6);
+  border-left: 1px solid rgba(0,255,255,0.3);
   overflow-y: auto;
+  backdrop-filter: blur(10px);
 }
 
+/* タイトル */
+h2 {
+  font-size: 36px;
+  letter-spacing: 5px;
+  text-shadow: 0 0 10px #00ffff, 0 0 30px #00ffff;
+}
+
+/* 曲リスト */
 .song-item {
-  padding: 10px;
-  border-bottom: 1px solid #333;
+  padding: 15px;
+  border-bottom: 1px solid rgba(0,255,255,0.2);
   cursor: pointer;
+  transition: 0.3s;
 }
 
 .song-item:hover {
-  background: #1e90ff;
+  background: rgba(0,255,255,0.2);
+  box-shadow: inset 0 0 10px #00ffff;
 }
 
 .selected {
-  background: orange !important;
+  background: #00ffff !important;
+  color: black;
+  box-shadow: 0 0 20px #00ffff;
 }
+
+/* 情報パネル */
+.info {
+  margin-top: 40px;
+  padding: 20px;
+  border: 1px solid rgba(0,255,255,0.3);
+  border-radius: 10px;
+  background: rgba(0,0,0,0.5);
+  box-shadow: 0 0 20px rgba(0,255,255,0.2);
+}
+
+.info div {
+  margin: 10px 0;
+  font-size: 18px;
+}
+
+/* ボタン */
+button {
+  padding: 12px 30px;
+  font-size: 16px;
+  border: 2px solid #00ffff;
+  background: transparent;
+  color: #00ffff;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+button:hover {
+  background: #00ffff;
+  color: black;
+  box-shadow: 0 0 20px #00ffff;
+}
+
 </style>
 </head>
-
-<h2>MUSIC SELECT</h2>
-<ul>
-    <li><a href="game.html?song=canon">Canon (Pachelbel)</a></li>
-    <li><a href="game.html?song=winter">Winter (Vivaldi)</a></li>
-</ul>
 
 <body>
 
 <div id="left">
-  <button onclick="pickFolder()">Songsフォルダを選択</button>
+  <h2>MUSIC SELECT</h2>
 
-  <h2 id="title">---</h2>
-  <div id="genre"></div>
-  <div id="artist"></div>
-  <div id="bpm"></div>
-  <div id="level"></div>
+  <button onclick="pickFolder()">SELECT SONG FOLDER</button>
+
+  <div class="info">
+    <div id="title">TITLE: ---</div>
+    <div id="genre">GENRE: ---</div>
+    <div id="artist">ARTIST: ---</div>
+    <div id="bpm">BPM: ---</div>
+    <div id="level">LEVEL: ---</div>
+  </div>
 </div>
 
 <div id="right"></div>
@@ -65,19 +132,18 @@ body {
 let songs = [];
 const right = document.getElementById("right");
 
-// フォルダ選択
-async function pickFolder() {
-  const dirHandle = await window.showDirectoryPicker();
-  songs = [];
+async function loadSongs() {
+  const res = await fetch('/songs');
+  songs = await res.json();
 
-  for await (const entry of dirHandle.values()) {
-    if (entry.kind === "directory") {
-      await scanSongFolder(entry);
-    }
-  }
+  right.innerHTML = "";
+
+  songs.forEach(addSongToList);
 }
 
-// 曲フォルダをスキャン
+// 起動時に自動ロード
+loadSongs();
+
 async function scanSongFolder(folderHandle) {
   for await (const file of folderHandle.values()) {
     if (file.kind === "file" && file.name.endsWith(".json")) {
@@ -91,7 +157,6 @@ async function scanSongFolder(folderHandle) {
   }
 }
 
-// 右側に追加
 function addSongToList(json) {
   const div = document.createElement("div");
   div.className = "song-item";
@@ -102,18 +167,17 @@ function addSongToList(json) {
   right.appendChild(div);
 }
 
-// 選択
 function selectSong(element, json) {
   document.querySelectorAll(".song-item")
     .forEach(el => el.classList.remove("selected"));
 
   element.classList.add("selected");
 
-  document.getElementById("title").textContent = json.meta.title;
-  document.getElementById("genre").textContent = "Genre: " + json.meta.genre;
-  document.getElementById("artist").textContent = "Artist: " + json.meta.artist;
+  document.getElementById("title").textContent = "TITLE: " + json.meta.title;
+  document.getElementById("genre").textContent = "GENRE: " + json.meta.genre;
+  document.getElementById("artist").textContent = "ARTIST: " + json.meta.artist;
   document.getElementById("bpm").textContent = "BPM: " + json.meta.bpm;
-  document.getElementById("level").textContent = "Level: " + json.meta.level;
+  document.getElementById("level").textContent = "LEVEL: " + json.meta.level;
 }
 </script>
 

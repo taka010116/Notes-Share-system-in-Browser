@@ -155,11 +155,6 @@
     },
     {
       "lane": 5,
-      "row": 8,
-      "wav": "codehiD.wav"
-    },
-    {
-      "lane": 5,
       "row": 32,
       "wav": "codehiA.wav"
     },
@@ -247,48 +242,47 @@
       "lane": 5,
       "row": 128,
       "wav": "codehiD.wav"
+    },
+    {
+      "lane": 5,
+      "row": 8,
+      "wav": "codehiD.wav"
+    },
+    {
+      "lane": 2,
+      "row": 152,
+      "wav": "lowG.wav"
+    },
+    {
+      "lane": 4,
+      "row": 173,
+      "wav": "D.wav"
+    },
+    {
+      "lane": 3,
+      "row": 170,
+      "wav": "C#.wav"
+    },
+    {
+      "lane": 1,
+      "row": 164,
+      "wav": "B.wav"
+    },
+    {
+      "lane": 1,
+      "row": 158,
+      "wav": "B.wav"
+    },
+    {
+      "lane": 0,
+      "row": 161,
+      "wav": "Alow.wav"
     }
   ],
   "bga": [
     {
       "row": 8,
-      "bmp": "sea1.bmp"
-    },
-    {
-      "row": 10,
-      "bmp": "sea2.bmp"
-    },
-    {
-      "row": 12,
-      "bmp": "sea3.bmp"
-    },
-    {
-      "row": 14,
-      "bmp": "sea4.bmp"
-    },
-    {
-      "row": 16,
-      "bmp": "sea5.bmp"
-    },
-    {
-      "row": 18,
-      "bmp": "sea6.bmp"
-    },
-    {
-      "row": 20,
-      "bmp": "sea7.bmp"
-    },
-    {
-      "row": 22,
-      "bmp": "sea8.bmp"
-    },
-    {
-      "row": 24,
-      "bmp": "sea9.bmp"
-    },
-    {
-      "row": 26,
-      "bmp": "sea10.bmp"
+      "bmp": "canon10045.bmp"
     }
   ]
 }

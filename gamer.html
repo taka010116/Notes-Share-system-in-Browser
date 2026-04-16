@@ -41,19 +41,32 @@
             display:flex;
         }
 
-        .lane{
-            flex:1;
-            border-left:1px solid #333;
-            border-right:1px solid #333;
-            position:relative;
-            overflow:hidden;
-            background:#000;
-            transition:background 0.05s;
-        }
+        .lane {
+    flex:1;
+    position:relative;
+    overflow:hidden;
+
+    background: linear-gradient(
+        to bottom,
+        #050510,
+        #0a0a1f 40%,
+        #000
+    );
+
+    border-left:1px solid rgba(0,200,255,0.2);
+    border-right:1px solid rgba(0,200,255,0.2);
+
+    box-shadow:
+        inset 0 0 20px rgba(0,150,255,0.1),
+        0 0 10px rgba(0,150,255,0.05);
+}
+        
 
         .lane.active{
             background:#444;
         }
+
+        
 
         /* 判定ライン */
 
@@ -150,6 +163,209 @@
             filter: drop-shadow(0 0 10px #fff) drop-shadow(0 0 20px #ff0) drop-shadow(0 0 30px #f0f);
         }
 
+        .lane {
+            flex:1;
+            border-left:1px solid #333;
+            border-right:1px solid #333;
+            position:relative;
+            overflow:hidden;
+            background:#000;
+        }
+
+        .lane.active {
+            animation: laneFlash 0.15s ease-out;
+        }
+
+        @keyframes laneFlash {
+            0% {
+                background: rgba(255,255,255,0.8);
+            }
+            100% {
+                background: rgba(255,255,255,0);
+            }
+        }
+
+        .lane.active {
+            animation: laneFlashOnce 0.2s ease-out forwards;
+        }
+
+        @keyframes laneFlashOnce {
+            0% {
+                background: rgba(255,255,255,0.9);
+            }
+            100% {
+                background: rgba(255,255,255,0);
+            }
+        }
+
+        .lane::after {
+            content:"";
+            position:absolute;
+            left:0;
+            width:100%;
+            height:100%;
+            background: linear-gradient(
+                to bottom,
+                transparent,
+                rgba(255,255,255,0.8),
+                transparent
+            );
+            opacity:0;
+        }
+
+        .lane.scan::after {
+            animation: laneScan 0.2s ease-out;
+        }
+
+        @keyframes laneScan {
+            0% {
+                transform: translateY(-100%);
+                opacity:1;
+            }
+            100% {
+                transform: translateY(100%);
+                opacity:0;
+            }
+        }
+
+        .hitEffect {
+            position:absolute;
+            width:100%;
+            height:40px;
+            left:0;
+            pointer-events:none;
+
+            display:flex;
+            justify-content:center;
+            align-items:center;
+        }       
+
+        .hitFlash {
+            position:absolute;
+            width:80%;
+            height:6px;
+            background: linear-gradient(to right,
+                transparent,
+                rgba(255,255,255,0.9),
+                transparent
+            );
+            border-radius:10px;
+            animation: flashExpand 0.2s ease-out forwards;
+        }
+
+        .hitBeam {
+            position:absolute;
+            bottom:0;
+            width:6px;
+            height:30px;
+            background: linear-gradient(to top,
+                rgba(255,255,255,0.9),
+                transparent
+            );
+            animation: beamRise 0.2s ease-out forwards;
+        }
+
+        @keyframes flashExpand {
+            0% {
+                transform: scaleX(0.3);
+                opacity:1;
+            }
+            100% {
+                transform: scaleX(1.2);
+                opacity:0;
+            }
+        }
+
+        @keyframes beamRise {
+            0% {
+                height:10px;
+                opacity:1;
+            }
+            100% {
+                height:50px;
+                opacity:0;
+            }
+        }
+
+        .hitEffect {
+    position:absolute;
+    width:100%;
+    height:80px;
+    left:0;
+    pointer-events:none;
+    display:flex;
+    justify-content:center;
+    align-items:flex-end;
+}
+
+/* 衝撃波（メイン） */
+.hitShock {
+    position:absolute;
+    width:20px;
+    height:20px;
+    border-radius:50%;
+    border:2px solid rgba(255,255,255,0.9);
+    animation: shockWave 0.35s ease-out forwards;
+}
+
+/* 横残光 */
+.hitLine {
+    position:absolute;
+    width:120%;
+    height:6px;
+    background: linear-gradient(to right,
+        transparent,
+        rgba(255,255,255,1),
+        transparent
+    );
+    animation: lineFade 0.25s ease-out forwards;
+}
+
+/* 上パーティクル */
+.hitParticle {
+    position:absolute;
+    width:4px;
+    height:12px;
+    background: rgba(255,255,255,0.9);
+    border-radius:2px;
+    animation: particleFly 0.4s ease-out forwards;
+}
+
+/* ===== アニメーション ===== */
+
+@keyframes shockWave {
+    0% {
+        transform: scale(0.3);
+        opacity:1;
+    }
+    100% {
+        transform: scale(6);
+        opacity:0;
+    }
+}
+
+@keyframes lineFade {
+    0% {
+        transform: scaleX(0.5);
+        opacity:1;
+    }
+    100% {
+        transform: scaleX(1.5);
+        opacity:0;
+    }
+}
+
+@keyframes particleFly {
+    0% {
+        transform: translateY(0);
+        opacity:1;
+    }
+    100% {
+        transform: translateY(-60px);
+        opacity:0;
+    }
+}
+
         /*@keyframes fcPulse {
             0% { transform: scale(1); filter: drop-shadow(0 0 10px #fff) brightness(1); }
             50% { transform: scale(1.05); filter: drop-shadow(0 0 15px #fff) brightness(1.2); }
@@ -210,9 +426,9 @@
         }
 
         const judgeTiming={
-            great:0.10,
-            good:0.20,
-            bad:0.38
+            great:0.04,
+            good:0.08,
+            bad:0.13
         }
 
         const lanesDiv=document.getElementById("lanes")
@@ -402,12 +618,17 @@
         ============================== */
 
         function flashLane(i){
-            lanes[i].classList.add("active")
-            setTimeout(()=>{
-                lanes[i].classList.remove("active")
-            },80)
-        }
+            const lane = lanes[i]
 
+            if(lane.classList.contains("active")) return
+
+            lane.classList.add("active")
+
+            lane.addEventListener("animationend", function handler(){
+                lane.classList.remove("active")
+                lane.removeEventListener("animationend", handler)
+            })
+        }
         /* ==============================
         次ノーツ音
         ============================== */
@@ -419,6 +640,40 @@
                     return
                 }
             }
+        }
+
+        //ノーツエフェクト
+        function createHitEffect(laneIndex){
+            const lane = lanes[laneIndex]
+
+            const effect = document.createElement("div")
+            effect.className = "hitEffect"
+            effect.style.bottom = "120px"
+
+            const shock = document.createElement("div")
+            shock.className = "hitShock"
+
+            const line = document.createElement("div")
+            line.className = "hitLine"
+
+            effect.appendChild(shock)
+            effect.appendChild(line)
+
+            for(let i=0;i<6;i++){
+                const p = document.createElement("div")
+                p.className = "hitParticle"
+
+                const offset = (Math.random()-0.5)*40
+                p.style.left = `calc(50% + ${offset}px)`
+
+                effect.appendChild(p)
+            }
+
+            lane.appendChild(effect)
+
+            setTimeout(()=>{
+                effect.remove()
+            },400)
         }
 
         /* ==============================
@@ -455,6 +710,7 @@
                     showJudge(j)
                     if(j==="GREAT" || j==="GOOD"){
                         combo++
+                        createHitEffect(lane)
                     }else{
                         combo=0
                     }
