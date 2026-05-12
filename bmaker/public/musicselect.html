@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>MUSIC SELECT</title>
+
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background: #000;
+  color: #00ffff;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* 背景演出 */
+body::before {
+  content: "";
+  position: fixed;
+  width: 200%;
+  height: 200%;
+  background:
+    repeating-linear-gradient(90deg, rgba(0,255,255,0.05) 0 1px, transparent 1px 80px),
+    repeating-linear-gradient(0deg, rgba(0,255,255,0.03) 0 1px, transparent 1px 80px);
+  animation: moveGrid 20s linear infinite;
+}
+
+@keyframes moveGrid {
+  from { transform: translate(0,0); }
+  to { transform: translate(-200px,-200px); }
+}
+
+/* レイアウト */
+#left {
+  flex: 2;
+  padding: 30px;
+  position: relative;
+  z-index: 2;
+}
+
+#right {
+  flex: 1;
+  background: rgba(0,0,0,0.6);
+  border-left: 1px solid rgba(0,255,255,0.3);
+  overflow-y: auto;
+  backdrop-filter: blur(10px);
+}
+
+/* タイトル */
+h2 {
+  font-size: 36px;
+  letter-spacing: 5px;
+  text-shadow: 0 0 10px #00ffff, 0 0 30px #00ffff;
+}
+
+/* 曲リスト */
+.song-item {
+  padding: 15px;
+  border-bottom: 1px solid rgba(0,255,255,0.2);
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.song-item:hover {
+  background: rgba(0,255,255,0.2);
+  box-shadow: inset 0 0 10px #00ffff;
+}
+
+.selected {
+  background: #00ffff !important;
+  color: black;
+  box-shadow: 0 0 20px #00ffff;
+}
+
+/* 情報パネル */
+.info {
+  margin-top: 40px;
+  padding: 20px;
+  border: 1px solid rgba(0,255,255,0.3);
+  border-radius: 10px;
+  background: rgba(0,0,0,0.5);
+  box-shadow: 0 0 20px rgba(0,255,255,0.2);
+}
+
+.info div {
+  margin: 10px 0;
+  font-size: 18px;
+}
+
+/* ボタン */
+button {
+  padding: 12px 30px;
+  font-size: 16px;
+  border: 2px solid #00ffff;
+  background: transparent;
+  color: #00ffff;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+button:hover {
+  background: #00ffff;
+  color: black;
+  box-shadow: 0 0 20px #00ffff;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="left">
+  <h2>MUSIC SELECT</h2>
+
+  <button onclick="pickFolder()">SELECT SONG FOLDER</button>
+
+  <div class="info">
+    <div id="title">TITLE: ---</div>
+    <div id="genre">GENRE: ---</div>
+    <div id="artist">ARTIST: ---</div>
+    <div id="bpm">BPM: ---</div>
+    <div id="level">LEVEL: ---</div>
+  </div>
+</div>
+
+<div id="right"></div>
+
+<script>
+let songs = [];
+const right = document.getElementById("right");
+
+async function loadSongs() {
+  const res = await fetch('/songs');
+  songs = await res.json();
+
+  right.innerHTML = "";
+
+  songs.forEach(addSongToList);
+}
+
+// 起動時に自動ロード
+loadSongs();
+
+async function scanSongFolder(folderHandle) {
+  for await (const file of folderHandle.values()) {
+    if (file.kind === "file" && file.name.endsWith(".json")) {
+      const fileData = await file.getFile();
+      const text = await fileData.text();
+      const json = JSON.parse(text);
+
+      songs.push(json);
+      addSongToList(json);
+    }
+  }
+}
+
+function addSongToList(json) {
+  const div = document.createElement("div");
+  div.className = "song-item";
+  div.textContent = json.meta.title;
+
+  div.onclick = () => selectSong(div, json);
+
+  right.appendChild(div);
+}
+
+function selectSong(element, json) {
+  document.querySelectorAll(".song-item")
+    .forEach(el => el.classList.remove("selected"));
+
+  element.classList.add("selected");
+
+  document.getElementById("title").textContent = "TITLE: " + json.meta.title;
+  document.getElementById("genre").textContent = "GENRE: " + json.meta.genre;
+  document.getElementById("artist").textContent = "ARTIST: " + json.meta.artist;
+  document.getElementById("bpm").textContent = "BPM: " + json.meta.bpm;
+  document.getElementById("level").textContent = "LEVEL: " + json.meta.level;
+}
+</script>
+
+</body>
+</html>
